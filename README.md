@@ -1,7 +1,15 @@
 2D JavaScript Graph Editor
 =========
 
-Currently add/remove points and segments through randomized buttons <br>
-Open console for success message of "Add Point" and "Add Segment"
+Simple web-based application that allows users to create and edit graphs by adding points and segments <br>
+2D infinite canvas with drag and zoom functionality
 
-<img width="500" alt="Screenshot 2024-01-04 at 12 02 05 AM" src="https://github.com/Samarth-G/GraphEditor-JS/assets/18361189/f61525e0-5583-4a15-b56d-85627b9e1d22">
+---
+> Functionality:
+> - left-click : add point
+> - right-click : remove point
+> - hold left-click : move point
+> - hold right-click : drag canvas
+> - scroll wheel : zoom in/out
+---
+<img width="450" alt="Screenshot 2024-01-05 at 2 45 57 AM" src="https://github.com/Samarth-G/GraphEditor-JS/assets/18361189/1f03df1e-a9cc-4242-b254-21ed7dbedd6e">
