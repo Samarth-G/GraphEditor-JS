@@ -1,9 +1,11 @@
 class Viewport {
-    constructor(canvas) {
+    constructor(canvas, {minZoom = 1, maxZoom = 5} = {}) {
         this.canvas = canvas;
         this.ctx = canvas.getContext("2d");
 
-        this.zoom = 1;
+        this.minZoom = minZoom;
+        this.maxZoom = maxZoom;
+        this.zoom = Math.max(minZoom, Math.min(maxZoom, 1));
         this.center = new Point(canvas.width/2, canvas.height/2);
         this.offset = scale(this.center, -1);
         this.drag = {
@@ -31,22 +33,35 @@ class Viewport {
             (event.offsetY - this.center.y) * this.zoom - this.offset.y);
     }
 
+    getVisibleBounds() { //world coordinates currently on screen
+        const center = scale(this.getOffset(), -1);
+        const halfWidth = this.canvas.width / 2 * this.zoom;
+        const halfHeight = this.canvas.height / 2 * this.zoom;
+        return {
+            left: center.x - halfWidth,
+            right: center.x + halfWidth,
+            top: center.y - halfHeight,
+            bottom: center.y + halfHeight
+        };
+    }
+
     getOffset() {
         return add(this.offset, this.drag.offset);
     }
 
     #addEventListeners() {
-        this.canvas.addEventListener("mousewheel", this.#handleMouseWheel.bind(this));
+        this.canvas.addEventListener("wheel", this.#handleMouseWheel.bind(this), {passive: false});
         this.canvas.addEventListener("mousedown", this.#handleMouseDown.bind(this));
         this.canvas.addEventListener("mousemove", this.#handleMouseMove.bind(this));
         this.canvas.addEventListener("mouseup", this.#handleMouseUp.bind(this));
     }
 
     #handleMouseWheel(event) {
+        event.preventDefault(); //zoom the canvas instead of scrolling the page
         const dir = Math.sign(event.deltaY);
         const step = 0.05;
         this.zoom += dir * step;
-        this.zoom = Math.max(1, Math.min(5, this.zoom));
+        this.zoom = Math.max(this.minZoom, Math.min(this.maxZoom, this.zoom));
     }
 
     #handleMouseDown(event) {

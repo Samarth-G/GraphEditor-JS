@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="styles.css">
+    <title>Road World</title>
+</head>
+<body>
+    <h1>Road World</h1>
+    <canvas id="myCanvas"></canvas>
+    <div id="controls">
+        <button onclick="goToGraphEditor()">&larr; Graph Editor</button>
+        <span class="divider"></span>
+        <button id="roadsModeButton" onclick="setMode('roads')">Edit Roads</button>
+        <button id="carsModeButton" onclick="setMode('cars')">Place Cars</button>
+        <span class="divider"></span>
+        <select id="styleSelect" onchange="this.blur()">
+            <option value="mixed">Mixed (city + suburbs)</option>
+            <option value="city">City</option>
+            <option value="suburb">Suburbs</option>
+            <option value="forest">Forest</option>
+        </select>
+        <button onclick="generateScenery()">Generate Scenery</button>
+        <button onclick="clearScenery()">Clear Scenery</button>
+        <span class="divider"></span>
+        <button onclick="removeCars()">Remove Cars</button>
+        <label><input type="checkbox" id="followToggle" checked> Follow car</label>
+        <span class="divider"></span>
+        <button onclick="dispose()">Clear</button>
+        <button onclick="save()">Save</button>
+    </div>
+    <p class="hint" id="modeHint"></p>
+    <p class="hint">Drive: <b>W A S D</b> or arrow keys &bull; <b>Space</b>: brake &bull; <b>Tab</b>: switch car &bull; Scroll: zoom</p>
+
+    <script src="js/graphEditor.js"></script>
+    <script src="js/viewport.js"></script>
+    <script src="js/math/graph.js"></script>
+    <script src="js/math/utilities.js"></script>
+    <script src="js/primitives/point.js"></script>
+    <script src="js/primitives/segment.js"></script>
+    <script src="js/primitives/polygon.js"></script>
+    <script src="js/items/building.js"></script>
+    <script src="js/items/tree.js"></script>
+    <script src="js/car.js"></script>
+    <script src="js/controls.js"></script>
+    <script src="js/carEditor.js"></script>
+    <script src="js/world.js"></script>
+    <script src="js/sceneryGenerator.js"></script>
+    <script>
+        myCanvas.width = Math.max(600, Math.min(1000, window.innerWidth - 40));
+        myCanvas.height = Math.max(450, Math.min(650, window.innerHeight - 230));
+        const ctx = myCanvas.getContext("2d");
+
+        const graphString = localStorage.getItem("graph");
+        const graphSaved = graphString ? JSON.parse(graphString) : null;
+        const graph = graphSaved ? Graph.load(graphSaved) : new Graph();
+
+        const worldString = localStorage.getItem("world");
+        const worldSaved = worldString ? JSON.parse(worldString) : null;
+        const world = worldSaved ? World.load(graph, worldSaved) : new World(graph);
+
+        const viewport = new Viewport(myCanvas, {minZoom: 0.5, maxZoom: 5});
+        if (graph.points.length > 0) { //start centered on the roads
+            const cx = graph.points.reduce((sum, p) => sum + p.x, 0) / graph.points.length;
+            const cy = graph.points.reduce((sum, p) => sum + p.y, 0) / graph.points.length;
+            viewport.offset = new Point(-cx, -cy);
+        }
+
+        const graphEditor = new GraphEditor(viewport, graph);
+        const carEditor = new CarEditor(viewport, world);
+        const generator = new SceneryGenerator(world);
+        const driveControls = new Controls();
+        driveControls.onSwitchCar = () => world.cycleActiveCar();
+
+        const modeHints = {
+            roads: "Left-click: add/connect point &bull; Drag: move point &bull; Right-click: remove point &bull; Right-drag: pan",
+            cars: "Left-click a road: add a car (in the lane you click) &bull; Left-click a car: drive it &bull; Right-click a car: remove it"
+        };
+        let mode = null;
+        setMode(graph.segments.length > 0 ? "cars" : "roads");
+
+        let lastTime = performance.now();
+        requestAnimationFrame(animate);
+
+        function animate(time) {
+            const dt = Math.min(3, Math.max(0, (time - lastTime) / (1000 / 60))); //1 = one frame at 60fps
+            lastTime = time;
+
+            world.update(dt, driveControls);
+
+            const car = world.activeCar;
+            if (followToggle.checked && car) {
+                viewport.offset = new Point(-car.x, -car.y);
+                viewport.drag.active = false;
+                viewport.drag.offset = new Point(0, 0);
+            }
+
+            viewport.reset();
+            const viewPoint = scale(viewport.getOffset(), -1);
+            world.draw(ctx, viewPoint, {
+                zoom: viewport.zoom,
+                bounds: viewport.getVisibleBounds(),
+                showNodes: mode == "roads"
+            });
+            if (mode == "roads") {
+                graphEditor.display({drawGraph: false, previewColor: "white"});
+            } else {
+                carEditor.display();
+            }
+            drawHud();
+
+            requestAnimationFrame(animate);
+        }
+
+        function drawHud() {
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.font = "bold 15px Arial";
+            ctx.textBaseline = "top";
+            ctx.textAlign = "left";
+
+            const car = world.activeCar;
+            if (car) {
+                const lines = [
+                    {text: `${Math.round(Math.abs(car.speed) * 20)} km/h${car.speed < -0.05 ? "  (R)" : ""}`, color: "white"},
+                    {text: `Car ${world.cars.indexOf(car) + 1} of ${world.cars.length}`, color: "#ccc"}
+                ];
+                if (car.offRoad) {
+                    lines.push({text: "Off-road!", color: "orange"});
+                }
+                ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+                ctx.fillRect(10, 10, 150, 14 + lines.length * 20);
+                lines.forEach((line, i) => {
+                    ctx.fillStyle = line.color;
+                    ctx.fillText(line.text, 20, 18 + i * 20);
+                });
+            }
+
+            let message = null;
+            if (graph.segments.length == 0) {
+                message = "Add some roads first: click \"Edit Roads\", then click to place connected points";
+            } else if (world.cars.length == 0) {
+                message = mode == "cars" ? "Click on a road to add a car" : "Click \"Place Cars\" to add a car";
+            }
+            if (message) {
+                ctx.textAlign = "center";
+                const width = ctx.measureText(message).width + 24;
+                ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+                ctx.fillRect(myCanvas.width / 2 - width / 2, myCanvas.height - 44, width, 30);
+                ctx.fillStyle = "white";
+                ctx.fillText(message, myCanvas.width / 2, myCanvas.height - 37);
+            }
+            ctx.restore();
+        }
+
+        function setMode(newMode) {
+            mode = newMode;
+            if (mode == "roads") {
+                carEditor.disable();
+                graphEditor.enable();
+            } else {
+                graphEditor.disable();
+                carEditor.enable();
+            }
+            roadsModeButton.classList.toggle("active", mode == "roads");
+            carsModeButton.classList.toggle("active", mode == "cars");
+            modeHint.innerHTML = modeHints[mode];
+        }
+
+        function generateScenery() {
+            if (!generator.generate(styleSelect.value)) {
+                alert("Draw some roads first, then generate the scenery around them.");
+            }
+        }
+
+        function clearScenery() {
+            world.buildings.length = 0;
+            world.trees.length = 0;
+        }
+
+        function removeCars() {
+            world.cars.length = 0;
+            world.activeCar = null;
+        }
+
+        function dispose() {
+            graphEditor.dispose();
+            world.clear();
+        }
+
+        function save() {
+            localStorage.setItem("graph", JSON.stringify(graph));
+            try {
+                localStorage.setItem("world", JSON.stringify(world));
+            } catch (error) {
+                alert("The roads were saved, but the scenery is too big to fit in local storage.");
+            }
+        }
+
+        function goToGraphEditor() {
+            save();
+            window.location.href = "index.html";
+        }
+    </script>
+</body>
+</html>

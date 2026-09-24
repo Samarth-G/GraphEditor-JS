@@ -10,14 +10,42 @@ class GraphEditor {
         this.dragging = false;
 
         this.ctx = this.canvas.getContext("2d");
+
+        this.enabled = false;
+        this.boundMouseDown = this.#handleMouseDown.bind(this);
+        this.boundMouseMove = this.#handleMouseMove.bind(this);
+        this.boundContextMenu = (event) => event.preventDefault();
+        this.boundMouseUp = () => this.dragging = false;
+        this.enable();
+    }
+
+    enable() {
+        if (this.enabled) return;
         this.#addEventListeners();
+        this.enabled = true;
+    }
+
+    disable() { //stops listening to the mouse so another tool can use the canvas
+        if (!this.enabled) return;
+        this.#removeEventListeners();
+        this.enabled = false;
+        this.selected = null;
+        this.hover = null;
+        this.dragging = false;
     }
 
     #addEventListeners() {
-        this.canvas.addEventListener("mousedown", this.#handleMouseDown.bind(this));
-        this.canvas.addEventListener("mousemove", this.#handleMouseMove.bind(this));
-        this.canvas.addEventListener("contextmenu", (event) => event.preventDefault());
-        this.canvas.addEventListener("mouseup", () => this.dragging = false);
+        this.canvas.addEventListener("mousedown", this.boundMouseDown);
+        this.canvas.addEventListener("mousemove", this.boundMouseMove);
+        this.canvas.addEventListener("contextmenu", this.boundContextMenu);
+        this.canvas.addEventListener("mouseup", this.boundMouseUp);
+    }
+
+    #removeEventListeners() {
+        this.canvas.removeEventListener("mousedown", this.boundMouseDown);
+        this.canvas.removeEventListener("mousemove", this.boundMouseMove);
+        this.canvas.removeEventListener("contextmenu", this.boundContextMenu);
+        this.canvas.removeEventListener("mouseup", this.boundMouseUp);
     }
 
     #handleMouseDown(event) {
@@ -70,14 +98,16 @@ class GraphEditor {
         this.selected = null;
     }
 
-    display() {
-        this.graph.draw(this.ctx);
+    display({drawGraph = true, previewColor = "black"} = {}) {
+        if (drawGraph) {
+            this.graph.draw(this.ctx);
+        }
         if (this.hover) {
             this.hover.draw(this.ctx, {fill: true});
         }
         if (this.selected) {
             const intent = this.hover ? this.hover : this.mouse; //passes nearest point instead of mouse if available
-            new Segment(this.selected, intent).draw(this.ctx, {dash: [8, 4]});
+            new Segment(this.selected, intent).draw(this.ctx, {color: previewColor, dash: [8, 4]});
             this.selected.draw(this.ctx, {outline: true});
         }
     }
