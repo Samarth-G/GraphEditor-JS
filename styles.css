@@ -11,3 +11,33 @@ h1 {
 #myCanvas {
     background-color: #228B22;
 }
+
+#controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    color: white;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+#controls button.active {
+    background-color: #ffd54a;
+    font-weight: bold;
+}
+
+#controls .divider {
+    width: 1px;
+    height: 20px;
+    margin: 0 4px;
+    background-color: #555;
+}
+
+.hint {
+    margin: 6px;
+    color: #bbb;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 14px;
+}

@@ -10,6 +10,7 @@
     <div id="controls">
         <button onclick="dispose()">Clear</button>
         <button onclick="save()">Save</button>
+        <button onclick="goToRoadWorld()">Road World &rarr;</button>
     </div>
     
     <script src="js/graphEditor.js"></script>
@@ -44,6 +45,11 @@
 
         function save() {
             localStorage.setItem("graph", JSON.stringify(graph));
+        }
+
+        function goToRoadWorld() {
+            save(); //the road world is built from the saved graph
+            window.location.href = "world.html";
         }
     </script>
 </body>
